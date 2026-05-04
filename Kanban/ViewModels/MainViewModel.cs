@@ -1,0 +1,305 @@
+﻿
+using Kanban.Models;
+using Kanban.ViewModels.Base;
+using Kanban.ViewModels.Commands;
+using Kanban.Views;
+using System;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Input;
+
+namespace Kanban.ViewModels
+{
+    public class MainViewModel : ViewModelBase
+    {
+        private readonly User _currentUser;
+        private BoardViewModel _selectedBoard;
+        private string _currentBoardTitle = "Загрузка...";
+        private bool _isLoading;
+        private readonly ObservableCollection<BoardViewModel> _boards;
+        private readonly ReadOnlyObservableCollection<BoardViewModel> _boardsReadOnly;
+        private readonly ObservableCollection<ColumnViewModel> _currentColumns;
+        private readonly ReadOnlyObservableCollection<ColumnViewModel> _currentColumnsReadOnly;
+
+        public MainViewModel(User currentUser)
+        {
+            _currentUser = currentUser;
+            _boards = new ObservableCollection<BoardViewModel>();
+            _boardsReadOnly = new ReadOnlyObservableCollection<BoardViewModel>(_boards);
+            _currentColumns = new ObservableCollection<ColumnViewModel>();
+            _currentColumnsReadOnly = new ReadOnlyObservableCollection<ColumnViewModel>(_currentColumns);
+
+            AddBoardCommand = new RelayCommand(ExecuteAddBoard);
+            ExitCommand = new RelayCommand(ExecuteExit);
+            SelectBoardCommand = new RelayCommand(ExecuteSelectBoard);
+            AddColumnCommand = new RelayCommand(ExecuteAddColumn);
+            DeleteColumnCommand = new RelayCommand(ExecuteDeleteColumn, CanExecuteDeleteColumn);
+            DeleteBoardCommand = new RelayCommand(ExecuteDeleteBoard);
+            AddTaskCommand = new RelayCommand(ExecuteAddTask);
+            DeleteTaskCommand = new RelayCommand(ExecuteDeleteTask);
+            OpenTaskEditCommand = new RelayCommand(ExecuteOpenTaskEdit);
+
+            LoadBoards();
+        }
+
+        public ReadOnlyObservableCollection<BoardViewModel> Boards => _boardsReadOnly;
+        public ReadOnlyObservableCollection<ColumnViewModel> CurrentColumns => _currentColumnsReadOnly;
+
+        public ICommand AddBoardCommand { get; }
+        public ICommand ExitCommand { get; }
+        public ICommand SelectBoardCommand { get; }
+        public ICommand AddColumnCommand { get; }
+        public ICommand DeleteColumnCommand { get; }
+        public ICommand DeleteBoardCommand { get; }
+        public ICommand AddTaskCommand { get; }
+        public ICommand DeleteTaskCommand { get; }
+        public ICommand OpenTaskEditCommand { get; }
+
+        public BoardViewModel SelectedBoard
+        {
+            get => _selectedBoard;
+            private set
+            {
+                if (SetProperty(ref _selectedBoard, value) && value != null)
+                {
+                    CurrentBoardTitle = value.Name;
+                    LoadColumns(value.Id);
+                }
+            }
+        }
+
+        public string CurrentBoardTitle
+        {
+            get => _currentBoardTitle;
+            private set => SetProperty(ref _currentBoardTitle, value);
+        }
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            private set => SetProperty(ref _isLoading, value);
+        }
+
+        public string UserName => _currentUser?.FullName ?? "Неизвестный";
+
+        private void LoadBoards()
+        {
+            IsLoading = true;
+            try
+            {
+                using var db = new KanbanContext();
+                var boardIds = db.UserBoards
+                    .Where(ub => ub.UserRole.UserId == _currentUser.Id)
+                    .Select(ub => ub.BoardId)
+                    .ToList();
+
+                var boards = db.Boards
+                    .Where(b => boardIds.Contains(b.Id))
+                    .ToList();
+
+                _boards.Clear();
+                foreach (var board in boards)
+                {
+                    var boardVM = new BoardViewModel(board);
+                    boardVM.LoadColumnsFromModel();
+                    _boards.Add(boardVM);
+                }
+
+                if (_boards.Any())
+                    SelectedBoard = _boards.First();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки досок: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private void LoadColumns(int boardId)
+        {
+            IsLoading = true;
+            try
+            {
+                using var db = new KanbanContext();
+                var columns = db.Columns
+                    .Where(c => c.BoardId == boardId)
+                    .OrderBy(c => c.Position)
+                    .ToList();
+
+                _currentColumns.Clear();
+                foreach (var column in columns)
+                {
+                    var columnVM = new ColumnViewModel(column);
+                    columnVM.LoadTasks();
+                    _currentColumns.Add(columnVM);
+                }
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private void ExecuteAddBoard(object parameter)
+        {
+            try
+            {
+                using var db = new KanbanContext();
+                var userRole = db.UserRoles.FirstOrDefault(ur => ur.UserId == _currentUser.Id);
+
+                if (userRole == null)
+                {
+                    MessageBox.Show("Ошибка: роль пользователя не найдена");
+                    return;
+                }
+
+                var newBoard = new Board { Name = $"Доска {_boards.Count + 1}", IsPrivate = true };
+                db.Boards.Add(newBoard);
+                db.SaveChanges();
+
+                db.Columns.Add(new Column { BoardId = newBoard.Id, Name = "Нужно сделать", Position = 1 });
+                db.Columns.Add(new Column { BoardId = newBoard.Id, Name = "В работе", Position = 2 });
+                db.Columns.Add(new Column { BoardId = newBoard.Id, Name = "Готово", Position = 3 });
+                db.SaveChanges();
+
+                db.UserBoards.Add(new UserBoard { BoardId = newBoard.Id, UserRoleId = userRole.Id });
+                db.SaveChanges();
+
+                var boardVM = new BoardViewModel(newBoard);
+                boardVM.LoadColumnsFromModel();
+                _boards.Add(boardVM);
+                SelectedBoard = boardVM;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка создания доски: {ex.Message}");
+            }
+        }
+
+        private void ExecuteSelectBoard(object parameter)
+        {
+            if (parameter is BoardViewModel board)
+                SelectedBoard = board;
+        }
+
+        private void ExecuteAddColumn(object parameter)
+        {
+            if (SelectedBoard == null) return;
+
+            var name = $"Колонка {SelectedBoard.Columns.Count + 1}";
+            var position = SelectedBoard.Columns.Count + 1;
+
+            using var db = new KanbanContext();
+            db.Columns.Add(new Column { BoardId = SelectedBoard.Id, Name = name, Position = position });
+            db.SaveChanges();
+            LoadColumns(SelectedBoard.Id);
+        }
+
+        private bool CanExecuteDeleteColumn(object parameter)
+        {
+            return parameter is ColumnViewModel column && column.Tasks.Count == 0;
+        }
+
+        private void ExecuteDeleteColumn(object parameter)
+        {
+            if (parameter is not ColumnViewModel column) return;
+
+            if (column.Tasks.Count > 0)
+            {
+                MessageBox.Show("Нельзя удалить колонку с задачами");
+                return;
+            }
+
+            if (MessageBox.Show($"Удалить колонку \"{column.Name}\"?", "Подтверждение",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+            using var db = new KanbanContext();
+            var columnToDelete = db.Columns.FirstOrDefault(c => c.Id == column.Id);
+            if (columnToDelete != null)
+            {
+                db.Columns.Remove(columnToDelete);
+                db.SaveChanges();
+                LoadColumns(SelectedBoard.Id);
+            }
+        }
+
+        private void ExecuteDeleteBoard(object parameter)
+        {
+            if (SelectedBoard == null) return;
+
+            if (MessageBox.Show($"Удалить доску \"{SelectedBoard.Name}\"?", "Подтверждение",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+
+            using var db = new KanbanContext();
+            var board = db.Boards.FirstOrDefault(b => b.Id == SelectedBoard.Id);
+            if (board != null)
+            {
+                var columns = db.Columns.Where(c => c.BoardId == board.Id).ToList();
+                foreach (var col in columns)
+                {
+                    var tasks = db.Tasks.Where(t => t.ColumnId == col.Id).ToList();
+                    db.Tasks.RemoveRange(tasks);
+                }
+                db.Columns.RemoveRange(columns);
+                db.UserBoards.RemoveRange(db.UserBoards.Where(ub => ub.BoardId == board.Id));
+                db.Boards.Remove(board);
+                db.SaveChanges();
+
+                _boards.Remove(SelectedBoard);
+                SelectedBoard = _boards.FirstOrDefault();
+            }
+        }
+
+        private void ExecuteAddTask(object parameter)
+        {
+            if (parameter is not ColumnViewModel column) return;
+
+            var title = "Новая задача";
+            var priority = "medium";
+
+            column.AddTask(title, priority);
+            LoadColumns(SelectedBoard.Id);
+        }
+
+        private void ExecuteDeleteTask(object parameter)
+        {
+            if (parameter is not TaskViewModel task) return;
+
+            if (MessageBox.Show($"Удалить задачу \"{task.Title}\"?", "Подтверждение",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+
+            using var db = new KanbanContext();
+            var dbTask = db.Tasks.FirstOrDefault(t => t.Id == task.Id);
+            if (dbTask != null)
+            {
+                db.Tasks.Remove(dbTask);
+                db.SaveChanges();
+                LoadColumns(SelectedBoard.Id);
+            }
+        }
+
+        private void ExecuteOpenTaskEdit(object parameter)
+        {
+            if (parameter is not TaskViewModel taskVM) return;
+
+            using var db = new KanbanContext();
+            var task = db.Tasks.FirstOrDefault(t => t.Id == taskVM.Id);
+            if (task != null)
+            {
+                var editVM = new TaskEditViewModel(task);
+                var editWindow = new TaskEditWindow(editVM);
+                editWindow.ShowDialog();
+                LoadColumns(SelectedBoard.Id);
+            }
+        }
+
+        private void ExecuteExit(object parameter)
+        {
+            Application.Current.Shutdown();
+        }
+    }
+}
