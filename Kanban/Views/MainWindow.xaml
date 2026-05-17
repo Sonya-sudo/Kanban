@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Kanban.ViewModels"
+        xmlns:vm="clr-namespace:Kanban.ViewModels"
         mc:Ignorable="d"
         Title="Kanban Доска" Height="700" Width="1200"
         WindowStartupLocation="CenterScreen"
@@ -50,9 +50,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" 
-                                CornerRadius="6" 
-                                Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -73,9 +71,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <TextBlock Text="{TemplateBinding Content}" 
-                                   VerticalAlignment="Center" 
-                                   HorizontalAlignment="Left"/>
+                        <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -85,6 +81,43 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+
+        <DataTemplate x:Key="TaskCardTemplate">
+            <Button Command="{Binding DataContext.OpenTaskEditCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                    CommandParameter="{Binding}"
+                    Padding="10" Margin="0,0,0,8"
+                    Cursor="Hand">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="White" CornerRadius="6" 
+                                BorderBrush="#E2E8F0" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <StackPanel>
+                    <Border Height="6" Width="40" CornerRadius="3" Margin="0,0,0,8" Background="#E2E8F0"/>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Text="⚠️ Эскалация" FontSize="10" Foreground="Red" 
+                               Margin="0,5,0,0"
+                               Visibility="{Binding Escalated, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+                        <Button Content="◀" Width="25" Height="20" Margin="2"
+                                Command="{Binding DataContext.MoveLeftCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource LinkButtonStyle}"/>
+                        <Button Content="▶" Width="25" Height="20" Margin="2"
+                                Command="{Binding DataContext.MoveRightCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource LinkButtonStyle}"/>
+                    </StackPanel>
+                    <Button Content="Удалить" FontSize="10" Margin="0,5,0,0"
+                            Style="{StaticResource LinkButtonStyle}" Foreground="#EF4444"
+                            Command="{Binding DataContext.DeleteTaskCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"/>
+                </StackPanel>
+            </Button>
+        </DataTemplate>
 
         <DataTemplate x:Key="ColumnTemplate">
             <Border Background="#F8FAFC" CornerRadius="8" Padding="10" Width="280" Margin="5">
@@ -96,7 +129,22 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="#334155"/>
+                        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" 
+                                 FontWeight="Bold" FontSize="14" 
+                                 Background="Transparent" BorderThickness="0" Cursor="IBeam">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TextBox">
+                                                <TextBlock Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}"
+                                                           FontWeight="Bold" FontSize="14"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
                         <TextBlock Text="{Binding Tasks.Count, StringFormat=' ({0})'}" 
                                    Foreground="#94A3B8" Margin="5,0,0,0"/>
                         <Button Content="✕" Width="20" Height="20" Margin="10,0,0,0"
@@ -106,34 +154,8 @@
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Tasks}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="White" CornerRadius="6" Padding="10" Margin="0,0,0,8"
-                                            BorderBrush="#E2E8F0" BorderThickness="1">
-                                        <Border.InputBindings>
-                                            <MouseBinding MouseAction="LeftDoubleClick"
-                                                          Command="{Binding DataContext.OpenTaskEditCommand, 
-                                                                    RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                          CommandParameter="{Binding}"/>
-                                        </Border.InputBindings>
-                                        <StackPanel>
-                                            <Border Height="6" Width="40" CornerRadius="3" Margin="0,0,0,8"
-                                                    Background="{Binding Priority}"/>
-                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            <TextBlock Text="⚠️ Эскалация" FontSize="10" Foreground="Red" 
-                                                       Margin="0,5,0,0"
-                                                       Visibility="{Binding Escalated}"/>
-                                            <Button Content="Удалить" FontSize="10" Margin="0,5,0,0"
-                                                    Style="{StaticResource LinkButtonStyle}" Foreground="#EF4444"
-                                                    Command="{Binding DataContext.DeleteTaskCommand, 
-                                                              RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                    CommandParameter="{Binding}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Tasks}" 
+                                      ItemTemplate="{StaticResource TaskCardTemplate}"/>
                     </ScrollViewer>
 
                     <Button Grid.Row="2" Content="+ Добавить карточку" 
@@ -152,7 +174,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- БОКОВАЯ ПАНЕЛЬ -->
+        <!-- Боковая панель -->
         <Border Grid.Column="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,1,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -163,8 +185,18 @@
 
                 <Border Grid.Row="0" Padding="20,30,20,20">
                     <StackPanel>
-                        <Ellipse Width="60" Height="60" Fill="#E2E8F0" Stroke="#CBD5E1" StrokeThickness="1"/>
-                        <TextBlock Text="{Binding UserName}" FontSize="18" FontWeight="SemiBold" Margin="0,15,0,0"/>
+                        <Border Width="60" Height="60" CornerRadius="30" Background="#E2E8F0" BorderBrush="#CBD5E1" BorderThickness="1">
+                            <Border.InputBindings>
+                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding OpenProfileCommand}"/>
+                            </Border.InputBindings>
+                            <Ellipse Width="60" Height="60" Fill="#E2E8F0"/>
+                        </Border>
+                        <TextBlock Text="{Binding UserName}" FontSize="18" FontWeight="SemiBold" 
+                                   Margin="0,15,0,0" Cursor="Hand">
+                            <TextBlock.InputBindings>
+                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding OpenProfileCommand}"/>
+                            </TextBlock.InputBindings>
+                        </TextBlock>
                         <TextBlock Text="Пользователь" FontSize="12" Foreground="#64748B"/>
                     </StackPanel>
                 </Border>
@@ -181,8 +213,7 @@
                                                  Style="{StaticResource BoardRadioButtonStyle}"
                                                  Content="{Binding Name}"
                                                  IsChecked="{Binding IsSelected}"
-                                                 Command="{Binding DataContext.SelectBoardCommand, 
-                                                           RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Command="{Binding DataContext.SelectBoardCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                  CommandParameter="{Binding}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -205,7 +236,7 @@
             </Grid>
         </Border>
 
-        <!-- ОСНОВНАЯ ОБЛАСТЬ -->
+        <!-- Основная область -->
         <Border Grid.Column="1" Background="Transparent">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
@@ -215,16 +246,14 @@
 
                 <Border Grid.Row="0" Margin="5,0,5,10">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding CurrentBoardTitle}" 
-                                   FontSize="24" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding CurrentBoardTitle}" FontSize="24" FontWeight="Bold"/>
                         <Button Content="+ Колонка" Margin="20,0,0,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding AddColumnCommand}"/>
                     </StackPanel>
                 </Border>
 
-                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" 
-                              VerticalScrollBarVisibility="Disabled">
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding CurrentColumns}" 
                                   ItemTemplate="{StaticResource ColumnTemplate}">
                         <ItemsControl.ItemsPanel>

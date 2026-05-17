@@ -8,19 +8,22 @@ namespace Kanban.ViewModels
     public class BoardViewModel : ViewModelBase
     {
         private readonly Board _model;
+        private readonly MainViewModel _mainViewModel;
         private bool _isSelected;
         private readonly ObservableCollection<ColumnViewModel> _columns;
         private readonly ReadOnlyObservableCollection<ColumnViewModel> _columnsReadOnly;
 
-        public BoardViewModel(Board model)
+        public BoardViewModel(Board model, MainViewModel mainViewModel)
         {
             _model = model;
+            _mainViewModel = mainViewModel;
             _columns = new ObservableCollection<ColumnViewModel>();
             _columnsReadOnly = new ReadOnlyObservableCollection<ColumnViewModel>(_columns);
         }
 
         public int Id => _model.Id;
         public string Name => _model.Name;
+        public bool IsPrivate => _model.IsPrivate ?? true;
 
         public ReadOnlyObservableCollection<ColumnViewModel> Columns => _columnsReadOnly;
 
@@ -41,7 +44,8 @@ namespace Kanban.ViewModels
 
             foreach (var column in columns)
             {
-                _columns.Add(new ColumnViewModel(column));
+                // ПЕРЕДАЁМ MainViewModel в ColumnViewModel
+                _columns.Add(new ColumnViewModel(column, _mainViewModel));
             }
         }
     }

@@ -39,6 +39,7 @@ namespace Kanban.ViewModels
             AddTaskCommand = new RelayCommand(ExecuteAddTask);
             DeleteTaskCommand = new RelayCommand(ExecuteDeleteTask);
             OpenTaskEditCommand = new RelayCommand(ExecuteOpenTaskEdit);
+            OpenProfileCommand = new RelayCommand(ExecuteOpenProfile);
 
             LoadBoards();
         }
@@ -55,6 +56,7 @@ namespace Kanban.ViewModels
         public ICommand AddTaskCommand { get; }
         public ICommand DeleteTaskCommand { get; }
         public ICommand OpenTaskEditCommand { get; }
+        public ICommand OpenProfileCommand { get; }
 
         public BoardViewModel SelectedBoard
         {
@@ -83,6 +85,27 @@ namespace Kanban.ViewModels
 
         public string UserName => _currentUser?.FullName ?? "Неизвестный";
 
+        public void MoveTaskToColumn(TaskViewModel task, ColumnViewModel sourceColumn, ColumnViewModel targetColumn)
+        {
+            if (sourceColumn == null || targetColumn == null) return;
+
+            using var db = new KanbanContext();
+            var dbTask = db.Tasks.FirstOrDefault(t => t.Id == task.Id);
+            if (dbTask == null) return;
+
+            dbTask.ColumnId = targetColumn.Id;
+
+            var maxOrder = db.Tasks
+                .Where(t => t.ColumnId == targetColumn.Id)
+                .Max(t => (int?)t.OrderInColumn) ?? 0;
+            dbTask.OrderInColumn = maxOrder + 1;
+
+            db.SaveChanges();
+
+            sourceColumn.LoadTasks();
+            targetColumn.LoadTasks();
+        }
+
         private void LoadBoards()
         {
             IsLoading = true;
@@ -101,7 +124,8 @@ namespace Kanban.ViewModels
                 _boards.Clear();
                 foreach (var board in boards)
                 {
-                    var boardVM = new BoardViewModel(board);
+                    // ПЕРЕДАЁМ MainViewModel в BoardViewModel
+                    var boardVM = new BoardViewModel(board, this);
                     boardVM.LoadColumnsFromModel();
                     _boards.Add(boardVM);
                 }
@@ -119,7 +143,7 @@ namespace Kanban.ViewModels
             }
         }
 
-        private void LoadColumns(int boardId)
+        public void LoadColumns(int boardId)
         {
             IsLoading = true;
             try
@@ -133,7 +157,8 @@ namespace Kanban.ViewModels
                 _currentColumns.Clear();
                 foreach (var column in columns)
                 {
-                    var columnVM = new ColumnViewModel(column);
+                    // ПЕРЕДАЁМ MainViewModel в ColumnViewModel
+                    var columnVM = new ColumnViewModel(column, this);
                     columnVM.LoadTasks();
                     _currentColumns.Add(columnVM);
                 }
@@ -169,7 +194,8 @@ namespace Kanban.ViewModels
                 db.UserBoards.Add(new UserBoard { BoardId = newBoard.Id, UserRoleId = userRole.Id });
                 db.SaveChanges();
 
-                var boardVM = new BoardViewModel(newBoard);
+                // ПЕРЕДАЁМ MainViewModel в BoardViewModel
+                var boardVM = new BoardViewModel(newBoard, this);
                 boardVM.LoadColumnsFromModel();
                 _boards.Add(boardVM);
                 SelectedBoard = boardVM;
@@ -258,10 +284,7 @@ namespace Kanban.ViewModels
         {
             if (parameter is not ColumnViewModel column) return;
 
-            var title = "Новая задача";
-            var priority = "medium";
-
-            column.AddTask(title, priority);
+            column.AddTask("Новая задача");
             LoadColumns(SelectedBoard.Id);
         }
 
@@ -292,9 +315,18 @@ namespace Kanban.ViewModels
             {
                 var editVM = new TaskEditViewModel(task);
                 var editWindow = new TaskEditWindow(editVM);
+                editWindow.Owner = Application.Current.MainWindow;
                 editWindow.ShowDialog();
-                LoadColumns(SelectedBoard.Id);
+                LoadColumns(SelectedBoard.Id); 
             }
+        }
+
+        private void ExecuteOpenProfile(object parameter)
+        {
+            var profileVM = new ProfileViewModel(_currentUser);
+            var profileWindow = new ProfileWindow(profileVM);
+            profileWindow.Owner = Application.Current.MainWindow;
+            profileWindow.ShowDialog();
         }
 
         private void ExecuteExit(object parameter)
