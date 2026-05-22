@@ -48,7 +48,23 @@ namespace Kanban.ViewModels
                 }
             }
         }
+        public void UpdateName(string newName)
+        {
+            if (_model.Name != newName)
+            {
+                _model.Name = newName;
+                OnPropertyChanged(nameof(Name));
 
+                // Сохраняем в БД
+                using var db = new KanbanContext();
+                var column = db.Columns.FirstOrDefault(c => c.Id == _model.Id);
+                if (column != null)
+                {
+                    column.Name = newName;
+                    db.SaveChanges();
+                }
+            }
+        }
         public int Position => _model.Position;
         public int? WipLimit => _model.WipLimit;
 
@@ -93,7 +109,7 @@ namespace Kanban.ViewModels
         {
             using var db = new KanbanContext();
             var tasks = db.Tasks
-                .Where(t => t.ColumnId == _model.Id)
+                .Where(t => t.ColumnId == _model.Id && (t.Status == null || t.Status == "InProgress"))
                 .OrderBy(t => t.OrderInColumn)
                 .ToList();
 

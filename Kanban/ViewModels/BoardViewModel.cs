@@ -25,12 +25,19 @@ namespace Kanban.ViewModels
         public string Name => _model.Name;
         public bool IsPrivate => _model.IsPrivate ?? true;
 
+
         public ReadOnlyObservableCollection<ColumnViewModel> Columns => _columnsReadOnly;
 
         public bool IsSelected
         {
             get => _isSelected;
             set => SetProperty(ref _isSelected, value);
+        }
+
+        public void UpdateName(string newName)
+        {
+            _model.Name = newName;
+            OnPropertyChanged(nameof(Name));
         }
 
         public void LoadColumnsFromModel()

@@ -45,6 +45,18 @@ namespace Kanban.Views
                 }
             }
         }
+        private void ColumnName_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var textBlock = sender as TextBlock;
+            var column = textBlock?.DataContext as ColumnViewModel;
+            if (column == null) return;
+
+            var inputDialog = new InputDialog("Введите новое название колонки", column.Name);
+            if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.Answer))
+            {
+                column.UpdateName(inputDialog.Answer);
+            }
+        }
         private void UserName_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             ViewModel?.OpenProfileCommand?.Execute(null);

@@ -15,7 +15,7 @@ public partial class Task
 
     public string? Priority { get; set; }
 
-    public DateOnly? Deadline { get; set; }
+    public DateTime? Deadline { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 
@@ -28,6 +28,8 @@ public partial class Task
     public string? Color { get; set; }
 
     public int? AssigneeId { get; set; }
+
+    public string Status { get; set; } = "InProgress"; // "InProgress" или "Completed"
 
     public virtual Column Column { get; set; } = null!;
 

@@ -129,28 +129,23 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" 
-                                 FontWeight="Bold" FontSize="14" 
-                                 Background="Transparent" BorderThickness="0" Cursor="IBeam">
-                            <TextBox.Style>
-                                <Style TargetType="TextBox">
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="TextBox">
-                                                <TextBlock Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}"
-                                                           FontWeight="Bold" FontSize="14"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </TextBox.Style>
-                        </TextBox>
+                        <TextBlock Text="{Binding Name}" 
+               FontWeight="Bold" FontSize="14" 
+               Foreground="#334155"
+               VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding Tasks.Count, StringFormat=' ({0})'}" 
-                                   Foreground="#94A3B8" Margin="5,0,0,0"/>
-                        <Button Content="✕" Width="20" Height="20" Margin="10,0,0,0"
-                                Style="{StaticResource LinkButtonStyle}" Foreground="#EF4444"
-                                Command="{Binding DataContext.DeleteColumnCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding}"/>
+               Foreground="#94A3B8" Margin="5,0,0,0"
+               VerticalAlignment="Center"/>
+                        <Button Content="✏️" Width="20" Height="20" Margin="10,0,0,0"
+                            Style="{StaticResource LinkButtonStyle}" Foreground="#64748B"
+                            ToolTip="Переименовать колонку"
+                            Command="{Binding DataContext.RenameColumnCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"/>
+                        <Button Content="✕" Width="20" Height="20" Margin="5,0,0,0"
+                            Style="{StaticResource LinkButtonStyle}" Foreground="#EF4444"
+                            ToolTip="Удалить колонку"
+                            Command="{Binding DataContext.DeleteColumnCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}"/>
                     </StackPanel>
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -246,10 +241,19 @@
 
                 <Border Grid.Row="0" Margin="5,0,5,10">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding CurrentBoardTitle}" FontSize="24" FontWeight="Bold"/>
-                        <Button Content="+ Колонка" Margin="20,0,0,0"
+                        <TextBlock Text="{Binding CurrentBoardTitle}" FontSize="24" FontWeight="Bold"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="✏️" Margin="10,0,0,0" 
+                                Background="Transparent" BorderThickness="0" 
+                                Foreground="#64748B" Cursor="Hand" Padding="5,0"
+                                ToolTip="Переименовать доску"
+                                Command="{Binding RenameBoardCommand}"/>
+                        <Button Content="+ Колонка" Margin="10,0,0,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding AddColumnCommand}"/>
+                        <Button Content="📜 История задач" Margin="20,10,20,0" 
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding OpenHistoryCommand}"/>
                     </StackPanel>
                 </Border>
 

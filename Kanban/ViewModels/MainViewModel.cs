@@ -22,6 +22,7 @@ namespace Kanban.ViewModels
         private readonly ObservableCollection<ColumnViewModel> _currentColumns;
         private readonly ReadOnlyObservableCollection<ColumnViewModel> _currentColumnsReadOnly;
 
+        public ICommand RenameBoardCommand { get; }
         public MainViewModel(User currentUser)
         {
             _currentUser = currentUser;
@@ -40,6 +41,9 @@ namespace Kanban.ViewModels
             DeleteTaskCommand = new RelayCommand(ExecuteDeleteTask);
             OpenTaskEditCommand = new RelayCommand(ExecuteOpenTaskEdit);
             OpenProfileCommand = new RelayCommand(ExecuteOpenProfile);
+            RenameBoardCommand = new RelayCommand(ExecuteRenameBoard);
+            RenameColumnCommand = new RelayCommand(ExecuteRenameColumn);
+            OpenHistoryCommand = new RelayCommand(ExecuteOpenHistory);
 
             LoadBoards();
         }
@@ -47,6 +51,7 @@ namespace Kanban.ViewModels
         public ReadOnlyObservableCollection<BoardViewModel> Boards => _boardsReadOnly;
         public ReadOnlyObservableCollection<ColumnViewModel> CurrentColumns => _currentColumnsReadOnly;
 
+        public ICommand RenameColumnCommand { get; }
         public ICommand AddBoardCommand { get; }
         public ICommand ExitCommand { get; }
         public ICommand SelectBoardCommand { get; }
@@ -57,7 +62,81 @@ namespace Kanban.ViewModels
         public ICommand DeleteTaskCommand { get; }
         public ICommand OpenTaskEditCommand { get; }
         public ICommand OpenProfileCommand { get; }
+        public ICommand OpenHistoryCommand { get; }
 
+
+        private void ExecuteOpenHistory(object parameter)
+        {
+            var historyVM = new HistoryViewModel(this);
+            var historyWindow = new HistoryWindow();
+            historyWindow.DataContext = historyVM;
+            historyWindow.Owner = Application.Current.MainWindow;
+            historyWindow.ShowDialog();
+        }
+
+        public void RefreshAllColumns()
+        {
+            if (SelectedBoard != null)
+                LoadColumns(SelectedBoard.Id);
+        }
+
+        private void ExecuteRenameColumn(object parameter)
+        {
+            if (parameter is not ColumnViewModel column) return;
+
+            var inputDialog = new InputDialog("Введите новое название колонки", column.Name);
+            if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.Answer))
+            {
+                var newName = inputDialog.Answer;
+
+                // Сохраняем в БД
+                using var db = new KanbanContext();
+                var dbColumn = db.Columns.FirstOrDefault(c => c.Id == column.Id);
+                if (dbColumn != null)
+                {
+                    dbColumn.Name = newName;
+                    db.SaveChanges();
+                }
+
+                // Принудительно обновляем название в ViewModel
+                column.UpdateName(newName);
+
+                // Дополнительно: перезагружаем колонки, чтобы UI точно обновился
+                LoadColumns(SelectedBoard.Id);
+            }
+        }
+
+        private void ExecuteRenameBoard(object parameter)
+        {
+            if (SelectedBoard == null) return;
+
+            var inputDialog = new InputDialog("Введите новое название доски", SelectedBoard.Name);
+            if (inputDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDialog.Answer))
+            {
+                var newName = inputDialog.Answer;
+
+                using var db = new KanbanContext();
+                var board = db.Boards.FirstOrDefault(b => b.Id == SelectedBoard.Id);
+                if (board != null)
+                {
+                    board.Name = newName;
+                    db.SaveChanges();
+
+                    // Обновляем CurrentBoardTitle (заголовок)
+                    CurrentBoardTitle = newName;
+                    SelectedBoard.UpdateName(newName);
+                    // Обновляем название в BoardViewModel через поле _model
+                    var field = typeof(BoardViewModel).GetField("_model",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var model = field?.GetValue(SelectedBoard) as Board;
+                    if (model != null)
+                    {
+                        model.Name = newName;
+                    }
+
+                }
+            }
+        }
         public BoardViewModel SelectedBoard
         {
             get => _selectedBoard;
